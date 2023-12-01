@@ -1,12 +1,19 @@
 const server = require('fastify')({
   logger: false
 })
+const fastifyCors  = require('@fastify/cors');
 const {Store} = require("fs-json-store");
+
+server.register(fastifyCors, {
+  origin: '*'
+});
 
 const store = new Store({file: "data.json"});
 
 server.get('/books', async (req, reply) => {
-  return await store.read();
+  const books = await store.read();
+  console.log(books);
+  return books;
 });
 
 server.post('/books', async (req, reply) => {
