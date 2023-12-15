@@ -3,12 +3,19 @@ const server = require('fastify')({
 })
 const fastifyCors  = require('@fastify/cors');
 const {Store} = require("fs-json-store");
+const config = require("config");
 
 server.register(fastifyCors, {
   origin: '*'
 });
 
 const store = new Store({file: "data.json"});
+const token = config.get('token');
+
+server.addHook('onRequest', (req, res, next) => {
+  if (req.headers?.authorization !==(`Bearer ${token}`)) return res.send(401);
+  next();
+})
 
 server.get('/books', async (req, reply) => {
   const books = await store.read();
