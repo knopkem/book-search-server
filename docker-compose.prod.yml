@@ -1,0 +1,19 @@
+services:
+  books-app:
+    image: ghcr.io/knopkem/book-search-server:latest
+    container_name: books-app
+    env_file:
+      - ./deploy/books.env
+    expose:
+      - '3000'
+    restart: unless-stopped
+    volumes:
+      - ./packages/server/data:/app/packages/server/data
+    networks:
+      - edge
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+
+networks:
+  edge:
+    external: true

@@ -1,0 +1,13 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$MAIN_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy {$MAIN_UPSTREAM}
+}
+
+{$BOOKS_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy {$BOOKS_UPSTREAM}
+}

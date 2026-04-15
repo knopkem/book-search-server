@@ -141,6 +141,101 @@ The compose setup:
 - exposes port `3000`
 - expects `.env` to be present
 
+## Docker image publishing
+
+GitHub Actions publishes the production image to:
+
+```text
+ghcr.io/knopkem/book-search-server
+```
+
+Published tags include:
+
+- `latest` for the default branch
+- branch names
+- git tags such as `v1.2.3`
+- commit SHA tags
+
+## Production deployment on a VPS with shared Caddy
+
+The repo includes a production-oriented books stack and a shared Caddy example for the host described in planning:
+
+- `docker-compose.prod.yml` — books app container, no public port, Watchtower-enabled
+- `deploy/docker-compose.caddy.yml` — shared Caddy reverse proxy
+- `config/Caddyfile.shared` — routes `pacsnode.com` and `books.pacsnode.com`
+- `deploy/books.env.example` — production app env template
+- `deploy/caddy.env.example` — shared Caddy env template
+
+### Intended topology
+
+- Cloudflare proxies both domains
+- Caddy is the only service exposing `80/443` on the VPS
+- The existing main app and the books app both join the same external Docker network: `edge`
+- Caddy routes:
+  - `pacsnode.com` → existing app
+  - `books.pacsnode.com` → books app
+
+### Recommended rollout
+
+1. Create the shared Docker network once:
+
+   ```bash
+   docker network create edge
+   ```
+
+2. Copy and fill the env files:
+
+   ```bash
+   cp deploy/books.env.example deploy/books.env
+   cp deploy/caddy.env.example deploy/caddy.env
+   ```
+
+3. Update the existing main-domain app so its container is reachable on the `edge` network at the hostname used in `MAIN_UPSTREAM`.
+
+4. Deploy the books app:
+
+   ```bash
+   docker compose -f docker-compose.prod.yml up -d
+   ```
+
+5. Deploy shared Caddy:
+
+   ```bash
+   docker compose -f deploy/docker-compose.caddy.yml up -d
+   ```
+
+### Production values
+
+For `deploy/books.env` set at least:
+
+```env
+GOOGLE_CLIENT_ID=...
+SESSION_SECRET=...
+ALLOWED_ORIGINS=https://books.pacsnode.com
+```
+
+### Cloudflare and Google
+
+Cloudflare:
+
+- create `books.pacsnode.com` pointing to the VPS
+- keep proxying enabled if desired
+- use Full / Full (strict) TLS mode
+
+Google OAuth client:
+
+- add `https://books.pacsnode.com` to **Authorized JavaScript origins**
+
+### Watchtower
+
+Both the books app and the shared Caddy example include:
+
+```text
+com.centurylinklabs.watchtower.enable=true
+```
+
+so a host-level Watchtower instance can update them when newer images are published.
+
 ## nginx reverse proxy
 
 An example config is provided at:

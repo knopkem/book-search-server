@@ -1,0 +1,26 @@
+services:
+  caddy:
+    image: caddy:2.10
+    container_name: shared-caddy
+    restart: unless-stopped
+    env_file:
+      - ./caddy.env
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ../config/Caddyfile.shared:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+    labels:
+      com.centurylinklabs.watchtower.enable: 'true'
+
+volumes:
+  caddy-data:
+  caddy-config:
+
+networks:
+  edge:
+    external: true
