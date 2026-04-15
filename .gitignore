@@ -1,20 +1,35 @@
 # Logs
 logs
 *.log
+
+# Local app data
 data.json
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+packages/server/data/
 
 # Runtime data
 pids
 *.pid
 *.seed
 
-# Coverage directory used by tools like istanbul
+# Coverage and caches
 coverage
 .eslintcache
+.vite
 
-# Dependency directory
-# https://www.npmjs.org/doc/misc/npm-faq.html#should-i-check-my-node_modules-folder-into-git
+# Dependencies
 node_modules
+
+# Build outputs
+dist
+packages/*/dist
+
+# Environment files
+.env
+.env.*
+!.env.example
 
 # OSX
 .DS_Store

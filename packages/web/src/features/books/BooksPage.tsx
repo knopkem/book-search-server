@@ -1,0 +1,305 @@
+import AddIcon from '@mui/icons-material/Add';
+import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import SaveIcon from '@mui/icons-material/Save';
+import {
+  Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Paper,
+  Snackbar,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
+import {
+  DataGrid,
+  GridActionsCellItem,
+  GridRowEditStopReasons,
+  GridRowModes,
+  type GridColDef,
+  type GridEventListener,
+  type GridRowId,
+  type GridRowModesModel,
+  type GridRowModel,
+} from '@mui/x-data-grid';
+import { useEffect, useMemo, useState } from 'react';
+
+import { apiRequest, ApiError } from '../../api/client';
+import type { Book } from '../../api/types';
+import { filterBooks, type BookFilters } from './filter-books';
+
+interface EditableBook extends Book {
+  isNew?: boolean;
+}
+
+const emptyFilters: BookFilters = {
+  author: '',
+  title: '',
+  remarks: '',
+};
+
+export function BooksPage() {
+  const [rows, setRows] = useState<EditableBook[]>([]);
+  const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
+  const [filters, setFilters] = useState<BookFilters>(emptyFilters);
+  const [loading, setLoading] = useState(true);
+  const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
+  const [deleteId, setDeleteId] = useState<GridRowId | null>(null);
+
+  const loadBooks = async () => {
+    setLoading(true);
+    try {
+      const books = await apiRequest<Book[]>('/api/books');
+      setRows(books);
+    } catch (error) {
+      setSnackbar({ message: getErrorMessage(error), severity: 'error' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadBooks();
+  }, []);
+
+  const visibleRows = useMemo(() => filterBooks(rows, filters), [filters, rows]);
+
+  const handleRowEditStop: GridEventListener<'rowEditStop'> = (params, event) => {
+    if (params.reason === GridRowEditStopReasons.rowFocusOut) {
+      event.defaultMuiPrevented = true;
+    }
+  };
+
+  const handleAdd = () => {
+    const id = crypto.randomUUID();
+    setRows((current) => [{ id, name: '', description: '', remarks: '', createdAt: '', updatedAt: '', isNew: true }, ...current]);
+    setRowModesModel((current) => ({
+      ...current,
+      [id]: { mode: GridRowModes.Edit, fieldToFocus: 'name' },
+    }));
+  };
+
+  const handleSave = (id: GridRowId) => () => {
+    setRowModesModel((current) => ({ ...current, [id]: { mode: GridRowModes.View } }));
+  };
+
+  const handleEdit = (id: GridRowId) => () => {
+    setRowModesModel((current) => ({ ...current, [id]: { mode: GridRowModes.Edit } }));
+  };
+
+  const handleCancel = (id: GridRowId) => () => {
+    setRowModesModel((current) => ({
+      ...current,
+      [id]: { mode: GridRowModes.View, ignoreModifications: true },
+    }));
+
+    setRows((current) => current.filter((row) => !(row.id === id && row.isNew)));
+  };
+
+  const handleDelete = (id: GridRowId) => () => {
+    setDeleteId(id);
+  };
+
+  const processRowUpdate = async (newRow: GridRowModel) => {
+    const payload = {
+      name: String(newRow.name ?? '').trim(),
+      description: String(newRow.description ?? '').trim(),
+      remarks: String(newRow.remarks ?? '').trim(),
+    };
+
+    const currentRow = rows.find((row) => row.id === newRow.id);
+
+    if (!currentRow) {
+      throw new Error('Book not found in local state.');
+    }
+
+    let savedRow: Book;
+
+    if (currentRow.isNew) {
+      savedRow = await apiRequest<Book>('/api/books', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      setSnackbar({ message: 'Book created.', severity: 'success' });
+    } else {
+      savedRow = await apiRequest<Book>(`/api/books/${currentRow.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      setSnackbar({ message: 'Book updated.', severity: 'success' });
+    }
+
+    const updatedRow: EditableBook = { ...savedRow, isNew: false };
+    setRows((current) => current.map((row) => (row.id === currentRow.id ? updatedRow : row)));
+
+    return updatedRow;
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteId) {
+      return;
+    }
+
+    try {
+      await apiRequest<void>(`/api/books/${deleteId}`, { method: 'DELETE' });
+      setRows((current) => current.filter((row) => row.id !== deleteId));
+      setSnackbar({ message: 'Book deleted.', severity: 'success' });
+    } catch (error) {
+      setSnackbar({ message: getErrorMessage(error), severity: 'error' });
+    } finally {
+      setDeleteId(null);
+    }
+  };
+
+  const columns = useMemo<GridColDef<EditableBook>[]>(
+    () => [
+      {
+        field: 'name',
+        headerName: 'Author',
+        flex: 1,
+        editable: true,
+        minWidth: 180,
+      },
+      {
+        field: 'description',
+        headerName: 'Title',
+        flex: 1.2,
+        editable: true,
+        minWidth: 220,
+      },
+      {
+        field: 'remarks',
+        headerName: 'Remarks',
+        flex: 1.8,
+        editable: true,
+        minWidth: 260,
+      },
+      {
+        field: 'actions',
+        type: 'actions',
+        headerName: 'Actions',
+        width: 120,
+        getActions: ({ id }) => {
+          const isEditing = rowModesModel[id]?.mode === GridRowModes.Edit;
+
+          if (isEditing) {
+            return [
+              <GridActionsCellItem icon={<SaveIcon />} label="Save" onClick={handleSave(id)} />,
+              <GridActionsCellItem icon={<DeleteIcon />} label="Cancel" onClick={handleCancel(id)} />,
+            ];
+          }
+
+          return [
+            <GridActionsCellItem icon={<EditIcon />} label="Edit" onClick={handleEdit(id)} />,
+            <GridActionsCellItem icon={<DeleteIcon />} label="Delete" onClick={handleDelete(id)} />,
+          ];
+        },
+      },
+    ],
+    [rowModesModel],
+  );
+
+  return (
+    <>
+      <Stack spacing={3}>
+        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} justifyContent="space-between">
+          <Box>
+            <Typography variant="h4">Books</Typography>
+            <Typography color="text.secondary">Manage your reading list directly in the browser.</Typography>
+          </Box>
+          <Button onClick={handleAdd} startIcon={<AddIcon />} variant="contained">
+            Add book
+          </Button>
+        </Stack>
+
+        <Paper sx={{ p: 2 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+            <TextField
+              fullWidth
+              label="Filter author"
+              value={filters.author}
+              onChange={(event) => setFilters((current) => ({ ...current, author: event.target.value }))}
+            />
+            <TextField
+              fullWidth
+              label="Filter title"
+              value={filters.title}
+              onChange={(event) => setFilters((current) => ({ ...current, title: event.target.value }))}
+            />
+            <TextField
+              fullWidth
+              label="Filter remarks"
+              value={filters.remarks}
+              onChange={(event) => setFilters((current) => ({ ...current, remarks: event.target.value }))}
+            />
+          </Stack>
+        </Paper>
+
+        <Paper sx={{ height: 620 }}>
+          <DataGrid
+            columns={columns}
+            disableRowSelectionOnClick
+            editMode="row"
+            loading={loading}
+            onProcessRowUpdateError={(error) =>
+              setSnackbar({
+                message: getErrorMessage(error),
+                severity: 'error',
+              })
+            }
+            onRowEditStop={handleRowEditStop}
+            processRowUpdate={processRowUpdate}
+            rowModesModel={rowModesModel}
+            rows={visibleRows}
+            onRowModesModelChange={setRowModesModel}
+            initialState={{
+              sorting: {
+                sortModel: [{ field: 'name', sort: 'asc' }],
+              },
+            }}
+          />
+        </Paper>
+      </Stack>
+
+      <Dialog open={deleteId !== null} onClose={() => setDeleteId(null)}>
+        <DialogTitle>Delete book?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>This permanently removes the book from your reading list.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteId(null)}>Cancel</Button>
+          <Button color="error" onClick={() => void confirmDelete()}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        autoHideDuration={4000}
+        onClose={() => setSnackbar(null)}
+        open={snackbar !== null}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        {snackbar ? <Alert severity={snackbar.severity}>{snackbar.message}</Alert> : undefined}
+      </Snackbar>
+    </>
+  );
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
+
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return 'Something went wrong.';
+}
