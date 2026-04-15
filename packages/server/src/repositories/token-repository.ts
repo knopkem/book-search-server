@@ -43,6 +43,17 @@ export class ApiTokenRepository {
     };
   }
 
+  async replaceNamedToken(userId: string, name: string) {
+    await this.db
+      .update(apiTokens)
+      .set({
+        revokedAt: new Date(),
+      })
+      .where(and(eq(apiTokens.userId, userId), eq(apiTokens.name, name), isNull(apiTokens.revokedAt)));
+
+    return this.create(userId, name);
+  }
+
   async authenticate(rawToken: string) {
     const [id, secret] = rawToken.split('.');
 

@@ -6,7 +6,7 @@ Browser-first replacement for the old Electron + sync workflow.
 
 - `packages/server` — Fastify 5 + TypeScript API/server
 - `packages/web` — React + Material UI web editor
-- `book-search-ionic` — existing read-only mobile client, still supported via API tokens
+- `book-search-ionic` — read-only mobile client with offline cache and native Google Sign-In
 
 ## Current architecture
 
@@ -18,7 +18,7 @@ Browser-first replacement for the old Electron + sync workflow.
 - Drizzle ORM + SQL migrations
 - Google Sign-In token verification
 - Secure cookie sessions for the web app
-- Per-user API tokens for the Ionic mobile app
+- Per-user mobile access tokens exchanged from native Google Sign-In
 
 ### Web app
 
@@ -48,7 +48,7 @@ Book {
 - Book CRUD API
 - Browser-based editing UI
 - Search/filtering in the grid
-- Mobile API token generation and revocation
+- Mobile Google Sign-In token exchange and revocation
 - Legacy `/books` endpoint compatibility for the Ionic client
 - SQLite migrations on startup
 - Rate limiting, Helmet, CORS, structured logging
@@ -64,7 +64,7 @@ Copy `.env.example` to `.env` and set real values.
 | `DATABASE_PATH` | no | SQLite database file path |
 | `GOOGLE_CLIENT_ID` | yes | Google OAuth client ID for browser sign-in |
 | `SESSION_SECRET` | yes | Long random string used to derive the session encryption key |
-| `ALLOWED_ORIGINS` | no | Comma-separated allowed browser origins |
+| `ALLOWED_ORIGINS` | no | Comma-separated allowed browser/mobile origins |
 | `RATE_LIMIT_MAX` | no | Max requests per time window |
 | `RATE_LIMIT_WINDOW` | no | Fastify rate-limit window |
 | `LOG_LEVEL` | no | Fastify/Pino log level |
@@ -115,17 +115,20 @@ Generated API docs are available at:
 /api/docs
 ```
 
-## Mobile app compatibility
+## Mobile app
 
-The Ionic app is still expected to call:
+The Ionic app now:
 
-- `GET /books`
+- uses native Google Sign-In on Android
+- exchanges the Google ID token at `POST /api/auth/google/mobile`
+- syncs books via `GET /books` with the returned mobile bearer token
+- revokes the mobile token at `POST /api/auth/mobile/logout`
 
-with:
+For local mobile builds, copy `book-search-ionic/.env.example` to `book-search-ionic/.env` and set:
 
-- `Authorization: Bearer <api-token>`
-
-Generate that token in the browser app under **Settings**.
+```env
+VITE_API_BASE_URL=http://localhost:3000
+```
 
 ## Docker deployment
 
@@ -211,7 +214,7 @@ For `deploy/books.env` set at least:
 ```env
 GOOGLE_CLIENT_ID=...
 SESSION_SECRET=...
-ALLOWED_ORIGINS=https://books.pacsnode.com
+ALLOWED_ORIGINS=https://books.pacsnode.com,http://localhost,capacitor://localhost
 ```
 
 ### Cloudflare and Google
@@ -249,5 +252,5 @@ Use it behind TLS termination with Let's Encrypt or your preferred certificate f
 ## Notes
 
 - The web app currently uses Google ID token verification from `@react-oauth/google`
-- The mobile app migration to Google Sign-In is intentionally not part of this repo change
+- Android builds currently fail under Java 24; use JDK 23 or JDK 21 for `book-search-ionic/android` builds
 - SQLite access now runs through `@libsql/client` with a local database file

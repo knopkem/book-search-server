@@ -12,7 +12,7 @@ const envSchema = z.object({
   DATABASE_PATH: z.string().default('./data/book-search.sqlite'),
   GOOGLE_CLIENT_ID: z.string().default(''),
   SESSION_SECRET: z.string().min(32).optional(),
-  ALLOWED_ORIGINS: z.string().default('http://localhost:5173'),
+  ALLOWED_ORIGINS: z.string().default('http://localhost:5173,http://localhost,capacitor://localhost'),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(200),
   RATE_LIMIT_WINDOW: z.string().default('1 minute'),
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),

@@ -21,6 +21,14 @@ export async function requireBearerUserId(
   request: FastifyRequest,
   context: AppContext,
 ) {
+  const token = await requireBearerToken(request, context);
+  return token.userId;
+}
+
+export async function requireBearerToken(
+  request: FastifyRequest,
+  context: AppContext,
+) {
   const header = request.headers.authorization;
 
   if (!header?.startsWith('Bearer ')) {
@@ -33,5 +41,5 @@ export async function requireBearerUserId(
     throw request.server.httpErrors.unauthorized('Invalid API token.');
   }
 
-  return token.userId;
+  return token;
 }
