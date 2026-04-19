@@ -35,5 +35,14 @@ export const bookIdParamsSchema = z.object({
 
 export const bulkBooksSchema = z.array(bookInputSchema).max(10_000);
 
+export const bookImportSummarySchema = z.object({
+  processedCount: z.number().int().nonnegative(),
+  importedCount: z.number().int().nonnegative(),
+  skippedExistingCount: z.number().int().nonnegative(),
+  skippedDuplicateCount: z.number().int().nonnegative(),
+  totalCount: z.number().int().nonnegative(),
+});
+
 export type BookInput = z.infer<typeof bookInputSchema>;
 export type BooksQuery = z.infer<typeof booksQuerySchema>;
+export type BookImportSummary = z.infer<typeof bookImportSummarySchema>;

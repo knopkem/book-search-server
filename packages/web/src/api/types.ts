@@ -21,3 +21,11 @@ export interface ApiToken {
   createdAt: string;
   lastUsedAt: string | null;
 }
+
+export interface CsvImportSummary {
+  processedCount: number;
+  importedCount: number;
+  skippedExistingCount: number;
+  skippedDuplicateCount: number;
+  totalCount: number;
+}

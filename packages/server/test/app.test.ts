@@ -56,4 +56,16 @@ describe('app', () => {
       message: 'Bearer token required.',
     });
   });
+
+  it('requires a session for csv import', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/books/import/csv',
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toMatchObject({
+      message: 'Authentication required.',
+    });
+  });
 });

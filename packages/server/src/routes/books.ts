@@ -1,12 +1,14 @@
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 
 import {
   bookIdParamsSchema,
+  bookImportSummarySchema,
   bookInputSchema,
   booksQuerySchema,
   bulkBooksSchema,
 } from '../schemas/book.js';
+import { LegacyCsvImportError, parseLegacyBooksCsv } from '../services/legacy-csv-import.js';
 import type { AppContext } from '../types.js';
 import { requireBearerUserId, requireSessionUserId } from '../utils/auth.js';
 
@@ -42,6 +44,35 @@ export function registerBookRoutes(app: FastifyInstance, context: AppContext) {
       }
 
       return book;
+    },
+  );
+
+  booksApp.post(
+    '/api/books/import/csv',
+    {
+      schema: {
+        consumes: ['multipart/form-data'],
+        response: {
+          200: bookImportSummarySchema,
+        },
+      },
+    },
+    async (request) => {
+      const userId = requireSessionUserId(request);
+      const csvText = await readCsvUpload(request);
+      let items: ReturnType<typeof parseLegacyBooksCsv>;
+
+      try {
+        items = parseLegacyBooksCsv(csvText);
+      } catch (error) {
+        if (error instanceof LegacyCsvImportError) {
+          throw request.server.httpErrors.badRequest(error.message);
+        }
+
+        throw error;
+      }
+
+      return context.repositories.books.mergeImported(userId, items);
     },
   );
 
@@ -118,4 +149,53 @@ export function registerBookRoutes(app: FastifyInstance, context: AppContext) {
       return books;
     },
   );
+}
+
+async function readCsvUpload(request: FastifyRequest) {
+  if (!request.isMultipart()) {
+    throw request.server.httpErrors.badRequest('Upload one CSV file using multipart/form-data.');
+  }
+
+  let csvText: string | null = null;
+
+  for await (const part of request.parts()) {
+    if (part.type !== 'file') {
+      throw request.server.httpErrors.badRequest('Only a single CSV file upload is allowed.');
+    }
+
+    if (part.fieldname !== 'file') {
+      throw request.server.httpErrors.badRequest('Upload field must be named "file".');
+    }
+
+    if (csvText !== null) {
+      throw request.server.httpErrors.badRequest('Only one CSV file can be uploaded at a time.');
+    }
+
+    const chunks: Uint8Array[] = [];
+
+    for await (const chunk of part.file) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+
+    if (part.file.truncated) {
+      throw request.server.httpErrors.payloadTooLarge('CSV upload exceeds the size limit.');
+    }
+
+    if (chunks.length === 0) {
+      throw request.server.httpErrors.badRequest('Uploaded CSV file is empty.');
+    }
+
+    try {
+      const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
+      csvText = new TextDecoder('utf-8', { fatal: true }).decode(Uint8Array.from(buffer));
+    } catch {
+      throw request.server.httpErrors.badRequest('CSV upload must be valid UTF-8 text.');
+    }
+  }
+
+  if (!csvText) {
+    throw request.server.httpErrors.badRequest('A CSV file is required.');
+  }
+
+  return csvText;
 }

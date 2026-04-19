@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import multipart from '@fastify/multipart';
 import rateLimit from '@fastify/rate-limit';
 import secureSession from '@fastify/secure-session';
 import sensible from '@fastify/sensible';
@@ -22,6 +23,7 @@ import { UserRepository } from './repositories/user-repository.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerBookRoutes } from './routes/books.js';
 import { registerUserRoutes } from './routes/user.js';
+import { MAX_CSV_IMPORT_BYTES } from './services/legacy-csv-import.js';
 import type { AppContext } from './types.js';
 
 export async function buildApp(config: AppConfig) {
@@ -104,6 +106,15 @@ export async function buildApp(config: AppConfig) {
     global: true,
     max: context.config.rateLimitMax,
     timeWindow: context.config.rateLimitWindow,
+  });
+  await app.register(multipart, {
+    limits: {
+      files: 1,
+      fields: 0,
+      parts: 1,
+      fileSize: MAX_CSV_IMPORT_BYTES,
+    },
+    throwFileSizeLimit: true,
   });
   await app.register(secureSession, {
     key: context.config.sessionKey,

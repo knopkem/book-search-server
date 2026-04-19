@@ -4,7 +4,7 @@ import { and, asc, eq, like, or } from 'drizzle-orm';
 
 import type { DbClient } from '../db/client.js';
 import { books } from '../db/schema.js';
-import type { BookInput, BooksQuery } from '../schemas/book.js';
+import type { BookImportSummary, BookInput, BooksQuery } from '../schemas/book.js';
 
 export class BookRepository {
   constructor(private readonly db: DbClient) {}
@@ -113,8 +113,61 @@ export class BookRepository {
 
     return this.listByUser(userId);
   }
+
+  async mergeImported(userId: string, items: BookInput[]): Promise<BookImportSummary> {
+    const existingBooks = await this.listByUser(userId);
+    const existingKeys = new Set(existingBooks.map((book) => buildMergeKey(book)));
+    const seenImportKeys = new Set<string>();
+    const booksToInsert: BookInput[] = [];
+    let skippedExistingCount = 0;
+    let skippedDuplicateCount = 0;
+
+    for (const item of items) {
+      const key = buildMergeKey(item);
+
+      if (existingKeys.has(key)) {
+        skippedExistingCount += 1;
+        continue;
+      }
+
+      if (seenImportKeys.has(key)) {
+        skippedDuplicateCount += 1;
+        continue;
+      }
+
+      seenImportKeys.add(key);
+      booksToInsert.push(item);
+    }
+
+    if (booksToInsert.length > 0) {
+      const now = new Date();
+      await this.db.insert(books).values(
+        booksToInsert.map((item) => ({
+          id: randomUUID(),
+          userId,
+          name: item.name,
+          description: item.description,
+          remarks: item.remarks,
+          createdAt: now,
+          updatedAt: now,
+        })),
+      );
+    }
+
+    return {
+      processedCount: items.length,
+      importedCount: booksToInsert.length,
+      skippedExistingCount,
+      skippedDuplicateCount,
+      totalCount: existingBooks.length + booksToInsert.length,
+    };
+  }
 }
 
 function escapeLike(value: string) {
   return value.replace(/[%_]/g, '\\$&');
+}
+
+function buildMergeKey(book: Pick<BookInput, 'name' | 'description'>) {
+  return `${book.name.trim()}\u0000${book.description.trim()}`;
 }

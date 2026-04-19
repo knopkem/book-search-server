@@ -2,6 +2,7 @@ import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import SaveIcon from '@mui/icons-material/Save';
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import {
   Alert,
   Box,
@@ -28,10 +29,10 @@ import {
   type GridRowModesModel,
   type GridRowModel,
 } from '@mui/x-data-grid';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 
 import { apiRequest, ApiError } from '../../api/client';
-import type { Book } from '../../api/types';
+import type { Book, CsvImportSummary } from '../../api/types';
 import { filterBooks, type BookFilters } from './filter-books';
 
 interface EditableBook extends Book {
@@ -49,8 +50,10 @@ export function BooksPage() {
   const [rowModesModel, setRowModesModel] = useState<GridRowModesModel>({});
   const [filters, setFilters] = useState<BookFilters>(emptyFilters);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
   const [snackbar, setSnackbar] = useState<{ message: string; severity: 'success' | 'error' } | null>(null);
   const [deleteId, setDeleteId] = useState<GridRowId | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadBooks = async () => {
     setLoading(true);
@@ -157,6 +160,38 @@ export function BooksPage() {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleImportSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+
+    if (!file) {
+      return;
+    }
+
+    setImporting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const summary = await apiRequest<CsvImportSummary>('/api/books/import/csv', {
+        method: 'POST',
+        body: formData,
+      });
+
+      await loadBooks();
+      setSnackbar({ message: formatImportSummary(summary), severity: 'success' });
+    } catch (error) {
+      setSnackbar({ message: getErrorMessage(error), severity: 'error' });
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const columns = useMemo<GridColDef<EditableBook>[]>(
     () => [
       {
@@ -213,9 +248,28 @@ export function BooksPage() {
             <Typography variant="h4">Books</Typography>
             <Typography color="text.secondary">Manage your reading list directly in the browser.</Typography>
           </Box>
-          <Button onClick={handleAdd} startIcon={<AddIcon />} variant="contained">
-            Add book
-          </Button>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <input
+              ref={fileInputRef}
+              accept=".csv,text/csv"
+              hidden
+              onChange={(event) => {
+                void handleImportSelected(event);
+              }}
+              type="file"
+            />
+            <Button
+              onClick={handleImportClick}
+              startIcon={<UploadFileIcon />}
+              variant="outlined"
+              disabled={importing}
+            >
+              {importing ? 'Importing...' : 'Import CSV'}
+            </Button>
+            <Button onClick={handleAdd} startIcon={<AddIcon />} variant="contained">
+              Add book
+            </Button>
+          </Stack>
         </Stack>
 
         <Paper sx={{ p: 2 }}>
@@ -290,6 +344,14 @@ export function BooksPage() {
       </Snackbar>
     </>
   );
+}
+
+function formatImportSummary(summary: CsvImportSummary) {
+  return [
+    `${summary.importedCount} imported`,
+    `${summary.skippedExistingCount} kept existing`,
+    `${summary.skippedDuplicateCount} skipped duplicate rows`,
+  ].join(' · ');
 }
 
 function getErrorMessage(error: unknown) {

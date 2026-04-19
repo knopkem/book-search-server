@@ -48,6 +48,7 @@ Book {
 - Book CRUD API
 - Browser-based editing UI
 - Search/filtering in the grid
+- CSV restore from legacy Electron backups
 - Mobile Google Sign-In token exchange and revocation
 - Legacy `/books` endpoint compatibility for the Ionic client
 - SQLite migrations on startup
@@ -129,6 +130,32 @@ For local mobile builds, copy `book-search-ionic/.env.example` to `book-search-i
 ```env
 VITE_API_BASE_URL=http://localhost:3000
 ```
+
+## CSV restore from the old Electron app
+
+The browser app can restore books from a legacy `books.csv` backup created by `book-search-electron`.
+
+Current behavior:
+
+- upload happens from the **Books** page
+- the server parses the CSV and validates it against the normal book rules
+- rows are matched by exact `author + title` (`name + description`)
+- when a match already exists, the current browser-stored row is kept unchanged
+- only non-matching rows are imported
+
+Expected CSV shape:
+
+```text
+name,description,remarks
+Author Name,Book Title,Optional remarks
+```
+
+Security notes:
+
+- uploads are authenticated and user-scoped
+- the server treats the file as text only
+- uploaded content is not executed, shelled out, or stored as a runnable file
+- strict size, row-count, and schema validation are applied
 
 ## Docker deployment
 
