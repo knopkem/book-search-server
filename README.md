@@ -241,7 +241,7 @@ For `deploy/books.env` set at least:
 ```env
 GOOGLE_CLIENT_ID=...
 SESSION_SECRET=...
-ALLOWED_ORIGINS=https://books.pacsnode.com,http://localhost,capacitor://localhost
+ALLOWED_ORIGINS=https://books.pacsnode.com,http://localhost,https://localhost,capacitor://localhost
 ```
 
 ### Cloudflare and Google
