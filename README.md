@@ -65,6 +65,7 @@ Copy `.env.example` to `.env` and set real values.
 | `DATABASE_PATH` | no | SQLite database file path |
 | `GOOGLE_CLIENT_ID` | yes | Google OAuth client ID for browser sign-in |
 | `SESSION_SECRET` | yes | Long random string used to derive the session encryption key |
+| `SESSION_MAX_AGE_DAYS` | no | Browser session lifetime in days for persistent web login, default `30` |
 | `ALLOWED_ORIGINS` | no | Comma-separated allowed browser/mobile origins |
 | `RATE_LIMIT_MAX` | no | Max requests per time window |
 | `RATE_LIMIT_WINDOW` | no | Fastify rate-limit window |
@@ -241,6 +242,7 @@ For `deploy/books.env` set at least:
 ```env
 GOOGLE_CLIENT_ID=...
 SESSION_SECRET=...
+SESSION_MAX_AGE_DAYS=30
 ALLOWED_ORIGINS=https://books.pacsnode.com,http://localhost,https://localhost,capacitor://localhost
 ```
 

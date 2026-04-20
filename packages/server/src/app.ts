@@ -26,6 +26,8 @@ import { registerUserRoutes } from './routes/user.js';
 import { MAX_CSV_IMPORT_BYTES } from './services/legacy-csv-import.js';
 import type { AppContext } from './types.js';
 
+const SECONDS_PER_DAY = 24 * 60 * 60;
+
 export async function buildApp(config: AppConfig) {
   const app = Fastify({
     logger: {
@@ -123,6 +125,7 @@ export async function buildApp(config: AppConfig) {
       sameSite: 'lax',
       httpOnly: true,
       secure: context.config.isProduction,
+      maxAge: context.config.sessionMaxAgeDays * SECONDS_PER_DAY,
     },
   });
 
