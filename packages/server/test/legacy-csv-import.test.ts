@@ -24,7 +24,7 @@ describe('legacy csv import', () => {
 
   it('rejects invalid rows', () => {
     expect(() => parseLegacyBooksCsv('name,description,remarks\n,,remark only\n')).toThrow(
-      'CSV row 2 is invalid: Author or title is required.',
+      'CSV row 2 is invalid: Author is required., Title is required.',
     );
   });
 

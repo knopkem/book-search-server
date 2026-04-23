@@ -7,11 +7,19 @@ const baseBookSchema = z.object({
 });
 
 export const bookInputSchema = baseBookSchema.superRefine((value, ctx) => {
-  if (!value.name && !value.description) {
+  if (!value.name) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Author or title is required.',
+      message: 'Author is required.',
       path: ['name'],
+    });
+  }
+
+  if (!value.description) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Title is required.',
+      path: ['description'],
     });
   }
 });

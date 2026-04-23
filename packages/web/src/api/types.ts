@@ -14,14 +14,6 @@ export interface Book {
   updatedAt: string;
 }
 
-export interface ApiToken {
-  id: string;
-  name: string;
-  tokenPreview: string;
-  createdAt: string;
-  lastUsedAt: string | null;
-}
-
 export interface CsvImportSummary {
   processedCount: number;
   importedCount: number;
